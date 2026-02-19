@@ -1,9 +1,9 @@
 # Assignment Title: Multi-Inheritance แบบ Java (Interfaces + Composition)
 
 ## Student Information
-- Name: [ใส่ชื่อ-นามสกุล]
-- Student ID: [ใส่รหัสนักศึกษา]
-- Submission Date: [ใส่วันที่ส่งงาน]
+- Name: ชาคริต แสนองค์การ
+- Student ID: 68122250070
+- Submission Date: 19/2/69
 
 ---
 
