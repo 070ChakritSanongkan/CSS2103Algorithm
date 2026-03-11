@@ -1,0 +1,38 @@
+แบบฝึกปฎิบัติMulti-thread.pdf
+
+Phase 1  
+คำถามที่ 1: ทำไมลำดับการเสร็จไม่เหมือนเดิมทุกครั้ง?  
+ตอบ:  
+การทำงานของ Thread ถูกจัดการโดย Thread Scheduler ของระบบปฏิบัติการ (OS) ซึ่งทำงานแบบ Non-deterministic ดังนั้นลำดับที่แน่นอนไม่สามารถคาดเดาได้  
+
+เมื่อเราเรียกคำสั่ง t1.start(), t2.start(), และ t3.start() ทั้ง 3 Threads จะเข้าสู่สถานะ "พร้อมทำงาน" (Runnable) และต้องแย่งเวลาของ CPU กันเอง OS จะสลับคิวให้แต่ละ Thread ทำงาน ทำให้ลำดับการชงกาแฟเสร็จในแต่ละครั้งที่รันโปรแกรมอาจเปลี่ยนไป ไม่เรียง 1-2-3 เสมอ  
+
+คำถามที่ 2: ถ้าเรียก run() แทน start() จะเกิดอะไรขึ้น?  
+ตอบ:  
+หากเราเปลี่ยนไปเรียก .run() โดยตรง โปรแกรมจะไม่สร้าง Thread ใหม่แยกออกมา จะไม่มี Multi-threading แต่คำสั่ง run() จะทำงานใน Main Thread ตัวเดียวตามลำดับ  
+
+ผลลัพธ์คือ บาริสต้าจะชง Espresso ให้เสร็จก่อน (รอ 2 วินาที) จากนั้นจึงเริ่มทำ Latte และเมื่อเสร็จถึงจะทำ Cappuccino ซึ่งผิดจุดประสงค์ที่ต้องการให้ชงพร้อมกัน  
+
+ตัวอย่างโค้ดที่เรียก run() แทน start():
+
+Java  
+public class CoffeeShopRunDirectly {  
+    public static void main(String[] args) {  
+        Thread t1 = new Thread(new CoffeeMaker("Espresso"));  
+        Thread t2 = new Thread(new CoffeeMaker("Latte"));  
+        Thread t3 = new Thread(new CoffeeMaker("Cappuccino"));  
+
+        // เรียก run() ตรงๆ จะไม่เกิด Multi-Thread  
+        t1.run();  
+        t2.run();  
+        t3.run();  
+
+        // ข้อความนี้จะรันหลังจากกาแฟทั้ง 3 แก้วทำเสร็จหมดแล้ว (ใช้เวลารวม 6 วินาที)  
+        System.out.println("รับออเดอร์ครบแล้ว");  
+    }  
+}  
+คำถามที่ 3: main thread ทำงานพร้อมกับ CoffeeMaker หรือไม่?  
+ตอบ:  
+ใช่ครับ ทำงานพร้อมกัน ทันทีที่ Main Thread รันคำสั่ง .start() มันจะมอบหมายงานให้ Thread ใหม่ จากนั้น Main Thread จะไปทำคำสั่งบรรทัดถัดไปทันที โดยไม่รอให้ CoffeeMaker ชงกาแฟเสร็จ  
+
+ด้วยเหตุนี้ ในโค้ด Phase 1 คำสั่ง System.out.println("รับออเดอร์ครบแล้ว"); ที่ทำงานอยู่บน Main Thread มักจะถูกพิมพ์ออกมาก่อนที่กาแฟแก้วใดๆ จะชงเสร็จครับ  
