@@ -1,0 +1,99 @@
+แบบฝึกปฎิบัติ Multi-thread
+
+Phase 2
+
+1. เพิ่มเมนูเป็น 10 รายการ แล้วสังเกตชื่อ thread  
+ลองเพิ่มเมนูเป็น 10 รายการ แล้วสังเกตดูชื่อ thread ที่รันขึ้นมา แต่ละ thread (Thread-1 ถึง Thread-10) จะวิ่งชนกันมั่วไปหมด เพราะทุกตัวจะแย่งกันเข้าทำงานในเมธอด brew() พร้อมกัน ถ้าพิมพ์ชื่อ thread ออกมาดูจะเห็นชัดเจนเลย
+
+ตัวอย่างโค้ด (Main):
+
+Java
+CoffeeMachine machine = new CoffeeMachine();
+for (int i = 1; i <= 10; i++) {
+    // ตั้งชื่อ Thread ให้ดูง่ายขึ้น
+    Thread t = new Thread(new CoffeeMaker("Menu " + i, machine), "Thread-" + i);
+    t.start();
+}
+
+2. เปลี่ยน Thread.sleep(2000) เป็นสุ่ม แล้วดูผลลัพธ์  
+ถ้าเปลี่ยนจาก Thread.sleep(2000) เป็นสุ่มเวลา (Math.random() * 3000) แต่ละแก้วจะใช้เวลาชงไม่เท่ากัน (0-3 วินาที) ผลที่ได้ก็คือ ลำดับตอนพิมพ์ "กำลังใช้เครื่องชง" กับ "เครื่องดื่มเสร็จ" จะปนกันไปหมด บางทีแก้วที่เริ่มชงทีหลังกลับเสร็จก่อน เห็นปัญหา race condition ชัดเจน
+
+ตัวอย่างโค้ด (ใน CoffeeMachine):
+
+Java
+// ...
+try {
+    long randomTime = (long)(Math.random() * 3000);
+    Thread.sleep(randomTime);
+} catch (InterruptedException e) {}
+// ...
+
+3. ลองเรียก run() แทน start() แล้วอธิบาย  
+ถ้าเรียก run() ตรง ๆ แทน start() จะไม่สร้าง thread ใหม่เลย โค้ดจะวิ่งแบบเรียงลำดับทีละคิวบน main thread เหมือนกับ phase 1 ไม่มี race condition เพราะไม่มีใครแย่งกันทำงาน แต่ก็เสียข้อดีของการรันพร้อมกันไปหมดเหมือนกัน สุดท้ายบาริสต้าต้องชงทีละแก้ว
+
+4. ใส่ System.out.println("End main") ต่อท้าย แล้วดูว่า main จบก่อนมั้ย  
+ลองใส่บรรทัดนี้ต่อท้าย แล้วรัน จะเห็นว่า main thread พิมพ์ "End main" ออกมาก่อนที่กาแฟแก้วแรกจะเสร็จซะอีก เพราะ main thread มีหน้าที่แค่สั่งงาน (start thread) พอสั่งครบมันก็ไปต่อทันที ไม่รอว่าลูก ๆ จะทำเสร็จรึยัง
+
+5. แก้ปัญหาโดยใช้ synchronized กับ AtomicInteger  
+- synchronized: ใส่ที่เมธอด brew() เพื่อให้เข้าใช้ทีละ 1 thread เท่านั้น (lock กันไว้) ใครจะชงก็ต้องเข้าคิวรอ
+- AtomicInteger: ใช้นับจำนวนแก้วที่ชงเสร็จแบบปลอดภัย ไม่ต้องกลัวค่าจะรวนตอนหลาย thread แย่งกันบวก
+
+โค้ดตัวอย่างแบบสมบูรณ์ (รวมข้อ 1, 2, 4, 5):
+
+Java
+import java.util.concurrent.atomic.AtomicInteger;
+
+// เครื่องชงกาแฟ
+class CoffeeMachine {
+    private AtomicInteger totalCups = new AtomicInteger(0);
+
+    // synchronized ให้เข้าใช้เครื่องทีละ 1 thread
+    public synchronized void brew(String menu) {
+        String threadName = Thread.currentThread().getName();
+        System.out.println("⏳ [" + threadName + "] เริ่มชง: " + menu);
+
+        try {
+            long randomTime = (long)(Math.random() * 3000);
+            Thread.sleep(randomTime);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        int currentCup = totalCups.incrementAndGet();
+        System.out.println("✅ [" + threadName + "] เครื่องดื่มเสร็จ: " + menu + " (แก้วที่ " + currentCup + ")");
+    }
+}
+
+// บาริสต้า
+class CoffeeMaker implements Runnable {
+    private String menu;
+    private CoffeeMachine machine;
+
+    public CoffeeMaker(String menu, CoffeeMachine machine) {
+        this.menu = menu;
+        this.machine = machine;
+    }
+
+    @Override
+    public void run() {
+        machine.brew(menu);
+    }
+}
+
+// main
+public class CoffeeShop {
+    public static void main(String[] args) {
+        CoffeeMachine machine = new CoffeeMachine();
+
+        System.out.println("--- เปิดร้าน รับ 10 ออเดอร์ ---");
+
+        for (int i = 1; i <= 10; i++) {
+            Thread t = new Thread(new CoffeeMaker("เมนูที่ " + i, machine), "Thread-" + i);
+            t.start();
+        }
+
+        System.out.println("🏁 End main (Main Thread สั่งงานเสร็จแล้ว เดินไปทำอย่างอื่นต่อ)");
+    }
+}
+
+พอรันโค้ดนี้ จะเห็นเลยว่า ถึงแม้ main จะสั่งงานรวดเดียว 10 threads แต่พอใส่ synchronized ที่ brew() เครื่องชงจะให้เข้าใช้ทีละเมนู เรียบร้อย ไม่มีใครแย่งกันแล้ว
